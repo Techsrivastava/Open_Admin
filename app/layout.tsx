@@ -10,7 +10,8 @@ import { NotificationProvider } from '@/contexts/notification-context';
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Open Door Expeditions",
+  title: "Open Door Admin - Dashboard Management",
+  description: "Open Door Admin Panel - Manage your expeditions with ease",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
