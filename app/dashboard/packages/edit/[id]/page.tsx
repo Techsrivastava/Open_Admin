@@ -176,6 +176,7 @@ export default function EditPackagePage() {
   const batchDatesArray = useFieldArray({ name: "batchDates", control: form.control })
   const additionalServicesArray = useFieldArray({ name: "additionalServices", control: form.control })
   const faqArray = useFieldArray({ name: "faq", control: form.control })
+  const howToReachArray = useFieldArray({ name: "howToReach", control: form.control })
 
   // Watch trekInfo array for dynamic placeholders
   const trekInfoWatch = useWatch({ control: form.control, name: "trekInfo" })
@@ -951,23 +952,23 @@ export default function EditPackagePage() {
                     <div>
                       <div className="flex items-center justify-between mb-4">
                         <FormLabel className="text-base">How to Reach</FormLabel>
-                        <Button type="button" variant="outline" size="sm" onClick={() => form.setValue("howToReach", [...(form.getValues("howToReach") || []), ""])} disabled={isLoading}>
+                        <Button type="button" variant="outline" size="sm" onClick={() => howToReachArray.append("")} disabled={isLoading}>
                           <Plus className="h-4 w-4 mr-2" />
                           Add Instruction
                         </Button>
                       </div>
-                      {(form.getValues("howToReach") || []).map((howToReachItem, index) => (
-                        <div key={index} className="flex items-center gap-2 mb-2">
+                      {howToReachArray.fields.map((field, index) => (
+                        <div key={field.id} className="flex items-center gap-2 mb-2">
                           <FormField
                             control={form.control}
                             name={`howToReach.${index}`}
-                            render={({ field }) => (
+                            render={({ field: fieldProps }) => (
                               <FormItem className="flex-1">
                                 <FormControl>
                                   <Textarea
                                     placeholder="Enter instruction on how to reach the destination"
                                     className="min-h-[100px]"
-                                    {...field}
+                                    {...fieldProps}
                                     disabled={isLoading}
                                   />
                                 </FormControl>
@@ -979,13 +980,10 @@ export default function EditPackagePage() {
                             type="button"
                             variant="ghost"
                             size="icon"
-                            onClick={() => {
-                              const current = form.getValues("howToReach") || []
-                              form.setValue("howToReach", current.filter((_, i) => i !== index))
-                            }}
-                            disabled={(form.getValues("howToReach") || []).length === 1}
+                            onClick={() => howToReachArray.remove(index)}
+                            disabled={isLoading}
                           >
-                            <Trash className="h-4 w-4" />
+                            <X className="h-4 w-4" />
                           </Button>
                         </div>
                       ))}
