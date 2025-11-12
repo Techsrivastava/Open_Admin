@@ -965,7 +965,7 @@ export default function EditPackagePage() {
                         <div key={field.id} className="flex items-center gap-2 mb-2">
                           <FormField
                             control={form.control}
-                            name={`howToReach.${index}`}
+                            name={`howToReach.${index}.instruction`}
                             render={({ field: fieldProps }) => (
                               <FormItem className="flex-1">
                                 <FormControl>

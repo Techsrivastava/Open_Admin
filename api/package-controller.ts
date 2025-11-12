@@ -27,7 +27,7 @@ export interface PackageFormData {
   isFeatured: boolean
   startDate?: string
   endDate?: string
-  howToReach: string[]
+  howToReach: { instruction: string }[]
   fitnessRequired?: string
   cancellationPolicy?: string
   whatToCarry: string[]
@@ -137,7 +137,11 @@ export const getPackageById = async (id: string): Promise<ApiResponse> => {
       isFeatured: Boolean(rawData.isFeatured),
       startDate: rawData.startDate || "",
       endDate: rawData.endDate || "",
-      howToReach: Array.isArray(rawData.howToReach) ? rawData.howToReach : [],
+      howToReach: Array.isArray(rawData.howToReach) 
+        ? rawData.howToReach.map((item: any) => 
+            typeof item === 'string' ? { instruction: item } : item
+          ) 
+        : [],
       fitnessRequired: rawData.fitnessRequired || "",
       cancellationPolicy: rawData.cancellationPolicy || "",
       whatToCarry: Array.isArray(rawData.whatToCarry) ? rawData.whatToCarry : [],

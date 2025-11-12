@@ -57,7 +57,7 @@ interface Package {
   maxParticipants?: string
   startDate?: string
   endDate?: string
-  howToReach?: string[]
+  howToReach?: { instruction: string }[]
   fitnessRequired?: string
   cancellationPolicy?: string
   whatToCarry?: any[]
@@ -113,7 +113,7 @@ export default function CreatePackagePage() {
       isFeatured: false,
       startDate: "",
       endDate: "",
-      howToReach: [""],
+      howToReach: [{ instruction: "" }],
       fitnessRequired: [],
       cancellationPolicy: [],
       whatToCarry: [{ item: "" }],
@@ -886,7 +886,7 @@ export default function CreatePackagePage() {
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={() => form.setValue("howToReach", [...form.getValues("howToReach"), ""])}
+                        onClick={() => form.setValue("howToReach", [...form.getValues("howToReach"), { instruction: "" }])}
                       >
                         <Plus className="h-4 w-4 mr-2" />
                         Add Instruction
@@ -896,7 +896,7 @@ export default function CreatePackagePage() {
                       <div key={index} className="flex items-center gap-2 mb-2">
                         <FormField
                           control={form.control}
-                          name={`howToReach.${index}` as any}
+                          name={`howToReach.${index}.instruction` as any}
                           render={({ field }) => (
                             <FormItem className="flex-1">
                               <FormControl>

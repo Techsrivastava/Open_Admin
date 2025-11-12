@@ -107,7 +107,7 @@ export const csvToPackage = (csvData: CSVPackageData): Partial<PackageFormValues
     inclusions: [],
     exclusions: [],
     itinerary: [],
-    howToReach: [],
+    howToReach: [{ instruction: "" }],
     fitnessRequired: [],
     cancellationPolicy: [],
     whatToCarry: [],
