@@ -57,7 +57,7 @@ interface Package {
   maxParticipants?: string
   startDate?: string
   endDate?: string
-  howToReach?: string[]
+  howToReach?: { instruction: string }[]
   fitnessRequired?: string[]
   cancellationPolicy?: string[]
   whatToCarry?: any[]
@@ -138,7 +138,7 @@ export default function EditPackagePage() {
       inclusions: [],
       exclusions: [],
       itinerary: [{ day: 1, title: "", description: "" }],
-      howToReach: [""],
+      howToReach: [{ instruction: "" }],
       fitnessRequired: [],
       cancellationPolicy: [],
       whatToCarry: [{ item: "" }],
@@ -252,7 +252,11 @@ export default function EditPackagePage() {
           itinerary: Array.isArray(pkg.itinerary) && pkg.itinerary.length > 0 
             ? pkg.itinerary 
             : [{ day: 1, title: "", description: "" }],
-          howToReach: Array.isArray(pkg.howToReach) ? pkg.howToReach : [""],
+          howToReach: Array.isArray(pkg.howToReach) && pkg.howToReach.length > 0 
+            ? pkg.howToReach.map((item: any) => 
+                typeof item === 'string' ? { instruction: item } : item
+              ) 
+            : [{ instruction: "" }],
           fitnessRequired: Array.isArray(pkg.fitnessRequired) ? pkg.fitnessRequired : [],
           cancellationPolicy: Array.isArray(pkg.cancellationPolicy) ? pkg.cancellationPolicy : [],
           whatToCarry: Array.isArray(pkg.whatToCarry) && pkg.whatToCarry.length > 0 
@@ -952,7 +956,7 @@ export default function EditPackagePage() {
                     <div>
                       <div className="flex items-center justify-between mb-4">
                         <FormLabel className="text-base">How to Reach</FormLabel>
-                        <Button type="button" variant="outline" size="sm" onClick={() => howToReachArray.append("")} disabled={isLoading}>
+                        <Button type="button" variant="outline" size="sm" onClick={() => howToReachArray.append({ instruction: "" })} disabled={isLoading}>
                           <Plus className="h-4 w-4 mr-2" />
                           Add Instruction
                         </Button>
