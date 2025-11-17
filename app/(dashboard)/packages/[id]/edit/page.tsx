@@ -1,5 +1,6 @@
 "use client"
 
+import type React from "react"
 import { useForm, useFieldArray } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { packageFormSchema } from "@/lib/validations/package"
@@ -15,7 +16,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
-import { ArrowLeft, Calendar, FileText, Plus, Trash, Upload, X, Loader2 } from "lucide-react"
+import { ArrowLeft, Calendar, FileText, Plus, Trash, Upload, X, Loader2, Trash2 } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import DashboardLayout from "@/components/dashboard-layout"
 import type { z } from "zod"
@@ -74,31 +75,61 @@ export default function EditPackagePage() {
       originalPrice: "",
       offerPrice: "",
       advancePayment: "",
-      location: "",
+      city: "",
+      state: "",
+      region: "",
       category: "",
+      coupons: [],
+      inclusions: [],
+      exclusions: [],
+      itinerary: [{ day: 1, title: "", description: "" }],
       maxParticipants: "",
       isActive: true,
       isFeatured: false,
       startDate: "",
       endDate: "",
-      howToReach: "",
-      fitnessRequired: "",
-      cancellationPolicy: "",
-      whatToCarry: [],
-      trekInfo: [],
+      howToReach: [""],
+      fitnessRequired: [],
+      cancellationPolicy: [],
+      whatToCarry: [{ item: "" }],
+      trekInfo: [
+        { title: "Rail Head", value: "" },
+        { title: "Region", value: "" },
+        { title: "Airport", value: "" },
+        { title: "Base Camp", value: "" },
+        { title: "Best Season", value: "" },
+        { title: "Service From", value: "" },
+        { title: "Grade", value: "" },
+        { title: "Stay", value: "" },
+        { title: "Trail Type", value: "" },
+        { title: "Duration", value: "" },
+        { title: "Meals", value: "" },
+        { title: "Maximum Altitude", value: "" },
+        { title: "Approx Trekking KM", value: "" }
+      ],
       batchDates: [],
       additionalServices: [],
       faq: [],
       images: {
         cardImage: "",
         trekMap: "",
-        gallery: [],
+        gallery: []
       },
-      pdf: "",
-      itinerary: "",
-      inclusions: [],
-      exclusions: [],
+      pdf: [],
+      assignedGuides: [],
+      views: 0,
+      bookingsCount: 0,
+      rating: 0,
+      tags: [],
+      isNew: false,
+      standoutReason: "",
+      isTrending: false,
+      trendingScore: 0,
+      moreLikeThis: [],
+      season: "",
+      labels: [],
     },
+    mode: "onChange"
   })
 
   // Fetch categories when component mounts
@@ -195,6 +226,9 @@ export default function EditPackagePage() {
         ...batch,
         startDate: batch.startDate ? new Date(batch.startDate).toISOString().split("T")[0] : "",
         endDate: batch.endDate ? new Date(batch.endDate).toISOString().split("T")[0] : "",
+        price: batch.price || "",
+        availability: Boolean(batch.availability),
+        seatsAvailable: batch.seatsAvailable || batch.maxParticipants || ""
       }))
     }
 
@@ -233,16 +267,16 @@ export default function EditPackagePage() {
       formattedData.faq = []
     }
 
-    if (!formattedData.howToReach) {
-      formattedData.howToReach = ""
+    if (!formattedData.howToReach || !Array.isArray(formattedData.howToReach)) {
+      formattedData.howToReach = []
     }
 
-    if (!formattedData.fitnessRequired) {
-      formattedData.fitnessRequired = ""
+    if (!formattedData.fitnessRequired || !Array.isArray(formattedData.fitnessRequired)) {
+      formattedData.fitnessRequired = []
     }
 
-    if (!formattedData.cancellationPolicy) {
-      formattedData.cancellationPolicy = ""
+    if (!formattedData.cancellationPolicy || !Array.isArray(formattedData.cancellationPolicy)) {
+      formattedData.cancellationPolicy = []
     }
 
     if (!formattedData.inclusions || !Array.isArray(formattedData.inclusions)) {
@@ -253,8 +287,8 @@ export default function EditPackagePage() {
       formattedData.exclusions = []
     }
 
-    if (!formattedData.itinerary) {
-      formattedData.itinerary = ""
+    if (!formattedData.itinerary || !Array.isArray(formattedData.itinerary)) {
+      formattedData.itinerary = []
     }
 
     // Reset form with the formatted data
@@ -371,28 +405,30 @@ export default function EditPackagePage() {
       // Add package ID
       formData.append("_id", packageId)
 
+      // Convert arrays back to strings for specific fields that backend expects as strings
+      const preparedData = { ...data }
+      
+      // Convert fitnessRequired array to string
+      if (Array.isArray(preparedData.fitnessRequired) && preparedData.fitnessRequired.length > 0) {
+        preparedData.fitnessRequired = preparedData.fitnessRequired.join("\n") as any
+      }
+      
+      // Convert cancellationPolicy array to string
+      if (Array.isArray(preparedData.cancellationPolicy) && preparedData.cancellationPolicy.length > 0) {
+        preparedData.cancellationPolicy = preparedData.cancellationPolicy.join("\n") as any
+      }
+
       // Add all form fields with proper validation
-      Object.keys(data).forEach((key) => {
+      Object.keys(preparedData).forEach((key) => {
         if (key !== "images" && key !== "pdf") {
-          const value = data[key as keyof PackageFormValues]
+          const value = preparedData[key as keyof PackageFormValues]
           if (value !== undefined && value !== null) {
             if (Array.isArray(value)) {
-              // For arrays, add each item individually
-              value.forEach((item, index) => {
-                if (typeof item === "object") {
-                  // For array of objects, add each property
-                  Object.entries(item).forEach(([prop, propValue]) => {
-                    formData.append(`${key}[${index}][${prop}]`, propValue?.toString() || "")
-                  })
-                } else {
-                  formData.append(`${key}[${index}]`, item?.toString() || "")
-                }
-              })
+              // Use JSON.stringify for arrays to maintain structure
+              formData.append(key, JSON.stringify(value))
             } else if (typeof value === "object") {
-              // For objects, add each property
-              Object.entries(value).forEach(([prop, propValue]) => {
-                formData.append(`${key}[${prop}]`, propValue?.toString() || "")
-              })
+              // Use JSON.stringify for objects
+              formData.append(key, JSON.stringify(value))
             } else {
               formData.append(key, value.toString())
             }
@@ -614,22 +650,10 @@ export default function EditPackagePage() {
                   />
                 </div>
 
-                {/* Itinerary */}
+                {/* Itinerary - Handled by separate state below */}
                 <div className="space-y-4">
                   <h3 className="text-lg font-medium">Itinerary</h3>
-                  <FormField
-                    control={form.control}
-                    name="itinerary"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Itinerary Details</FormLabel>
-                        <FormControl>
-                          <Textarea {...field} className="min-h-[200px]" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  <p className="text-sm text-muted-foreground">Itinerary is managed in the dedicated Itinerary tab below</p>
                 </div>
 
                 {/* Inclusions and Exclusions */}
@@ -639,15 +663,25 @@ export default function EditPackagePage() {
                     <FormField
                       control={form.control}
                       name="inclusions"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Included Items</FormLabel>
-                          <FormControl>
-                            <Textarea {...field} value={field.value?.join("\n") || ""} onChange={(e) => field.onChange(e.target.value.split("\n"))} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
+                      render={({ field }) => {
+                        const handleInclusionsChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+                          field.onChange(e.target.value.split("\n").filter(item => item.trim()))
+                        }
+                        return (
+                          <FormItem>
+                            <FormLabel>Included Items (one per line)</FormLabel>
+                            <FormControl>
+                              <Textarea 
+                                value={Array.isArray(field.value) ? field.value.join("\n") : ""}
+                                onChange={handleInclusionsChange}
+                                className="min-h-[150px]"
+                                placeholder="Enter inclusions, one per line"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )
+                      }}
                     />
                   </div>
                   <div className="space-y-4">
@@ -655,15 +689,25 @@ export default function EditPackagePage() {
                     <FormField
                       control={form.control}
                       name="exclusions"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Excluded Items</FormLabel>
-                          <FormControl>
-                            <Textarea {...field} value={field.value?.join("\n") || ""} onChange={(e) => field.onChange(e.target.value.split("\n"))} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
+                      render={({ field }) => {
+                        const handleExclusionsChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+                          field.onChange(e.target.value.split("\n").filter(item => item.trim()))
+                        }
+                        return (
+                          <FormItem>
+                            <FormLabel>Excluded Items (one per line)</FormLabel>
+                            <FormControl>
+                              <Textarea 
+                                value={Array.isArray(field.value) ? field.value.join("\n") : ""}
+                                onChange={handleExclusionsChange}
+                                className="min-h-[150px]"
+                                placeholder="Enter exclusions, one per line"
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )
+                      }}
                     />
                   </div>
                 </div>

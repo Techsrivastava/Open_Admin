@@ -34,7 +34,8 @@ export const packageFormSchema = z.object({
     startDate: z.string(),
     endDate: z.string(),
     price: z.string(),
-    availability: z.boolean()
+    availability: z.boolean(),
+    seatsAvailable: z.union([z.string(), z.number()]).optional()
   })),
   additionalServices: z.array(z.object({
     name: z.string(),
@@ -51,7 +52,7 @@ export const packageFormSchema = z.object({
     trekMap: z.string().optional(),
     gallery: z.array(z.string()).optional()
   }),
-  pdf: z.array(z.string()).optional(),
+  pdf: z.union([z.array(z.string()), z.string()]).optional(),
   assignedGuides: z.array(z.string()).optional(),
   views: z.number().optional(),
   bookingsCount: z.number().optional(),

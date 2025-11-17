@@ -22,13 +22,6 @@ import { getPackageById, updatePackage, getCategories } from "@/api/package-cont
 import { packageFormSchema } from "@/lib/validations/package"
 import type { z } from "zod"
 
-// Add interface for ItineraryDay
-interface ItineraryDay {
-  day: number
-  title: string
-  description: string
-}
-
 // Update the API response type
 interface ApiResponse {
   success: boolean
@@ -132,21 +125,7 @@ export default function EditPackagePage() {
       fitnessRequired: [],
       cancellationPolicy: [],
       whatToCarry: [{ item: "" }],
-      trekInfo: [
-        { title: "Rail Head", value: "" },
-        { title: "Region", value: "" },
-        { title: "Airport", value: "" },
-        { title: "Base Camp", value: "" },
-        { title: "Best Season", value: "" },
-        { title: "Service From", value: "" },
-        { title: "Grade", value: "" },
-        { title: "Stay", value: "" },
-        { title: "Trail Type", value: "" },
-        { title: "Duration", value: "" },
-        { title: "Meals", value: "" },
-        { title: "Maximum Altitude", value: "" },
-        { title: "Approx Trekking KM", value: "" },
-      ],
+      trekInfo: [],
       batchDates: [],
       additionalServices: [],
       faq: [],
@@ -166,17 +145,6 @@ export default function EditPackagePage() {
   const batchDatesArray = useFieldArray({ name: "batchDates", control: form.control })
   const additionalServicesArray = useFieldArray({ name: "additionalServices", control: form.control })
   const faqArray = useFieldArray({ name: "faq", control: form.control })
-  // Remove useFieldArray for howToReach
-  // Instead, handle howToReach as a simple array of strings in the form state
-  // Update the UI to render a list of textareas for each howToReach item, with add/remove buttons
-  // Fix galleryImages file handler to avoid Array.from(null)
-
-  // Debug environment variables
-  useEffect(() => {
-    console.log("🌐 Environment check:", {
-      NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || "Not set",
-    })
-  }, [])
 
   // Fetch categories
   useEffect(() => {
@@ -195,6 +163,7 @@ export default function EditPackagePage() {
     getPackageById(packageId).then(response => {
       if (response.success && response.data) {
         const pkg = response.data.data || response.data
+
         // Set existing images and pdf
         setExistingImages({
           cardImage: pkg.images?.cardImage,
@@ -202,10 +171,32 @@ export default function EditPackagePage() {
           gallery: Array.isArray(pkg.images?.gallery) ? pkg.images.gallery : [],
         })
         setExistingPdf(Array.isArray(pkg.pdf) ? pkg.pdf[0] : pkg.pdf || null)
-        // Reset form with fetched data
+
+        // Reset form with fetched data and initialize field arrays
         form.reset({
           ...pkg,
           category: pkg.category?._id || pkg.category || "",
+          // Ensure arrays are properly initialized
+          inclusions: Array.isArray(pkg.inclusions) ? pkg.inclusions : [],
+          exclusions: Array.isArray(pkg.exclusions) ? pkg.exclusions : [],
+          itinerary: Array.isArray(pkg.itinerary) ? pkg.itinerary.map((item: any) => ({
+            day: Number(item.day) || 1,
+            title: item.title || "",
+            description: item.description || ""
+          })) : [{ day: 1, title: "", description: "" }],
+          howToReach: Array.isArray(pkg.howToReach) ? pkg.howToReach : [""],
+          fitnessRequired: Array.isArray(pkg.fitnessRequired) ? pkg.fitnessRequired : [],
+          cancellationPolicy: Array.isArray(pkg.cancellationPolicy) ? pkg.cancellationPolicy : [],
+          whatToCarry: Array.isArray(pkg.whatToCarry) ? pkg.whatToCarry.map((item: any) => ({
+            item: typeof item === 'string' ? item : item?.item || ""
+          })) : [{ item: "" }],
+          trekInfo: Array.isArray(pkg.trekInfo) ? pkg.trekInfo.map((info: any) => ({
+            title: info.title || "",
+            value: info.value || ""
+          })) : [],
+          batchDates: Array.isArray(pkg.batchDates) ? pkg.batchDates : [],
+          additionalServices: Array.isArray(pkg.additionalServices) ? pkg.additionalServices : [],
+          faq: Array.isArray(pkg.faq) ? pkg.faq : [],
         })
       } else {
         toast({ title: "Error", description: response.message || "Failed to fetch package data", variant: "destructive" })
@@ -679,7 +670,6 @@ export default function EditPackagePage() {
                         </FormItem>
                       )}
                     />
-                    {/* Add similar fields for standoutReason, season, assignedGuides, etc. */}
                   </CardContent>
                   <CardFooter className="flex justify-between">
                     <Button
@@ -765,13 +755,21 @@ export default function EditPackagePage() {
                         {itineraryArray.fields.map((field, index) => (
                           <div key={field.id} className="grid gap-4">
                             <div className="flex items-center gap-2">
-                              <span className="font-medium min-w-[80px]">Day {field.day}</span>
-                              <Input
-                                value={field.title}
-                                onChange={(e) => itineraryArray.update(index, { ...field, title: e.target.value })}
-                                placeholder={`Enter day ${field.day} title`}
-                                className="flex-1"
-                                disabled={isLoading}
+                              <span className="font-medium min-w-[80px]">Day {index + 1}</span>
+                              <FormField
+                                control={form.control}
+                                name={`itinerary.${index}.title`}
+                                render={({ field }) => (
+                                  <FormControl>
+                                    <Input
+                                      value={field.value}
+                                      onChange={field.onChange}
+                                      placeholder={`Enter day ${index + 1} title`}
+                                      className="flex-1"
+                                      disabled={isLoading}
+                                    />
+                                  </FormControl>
+                                )}
                               />
                               <Button
                                 type="button"
@@ -783,12 +781,20 @@ export default function EditPackagePage() {
                                 <X className="h-4 w-4" />
                               </Button>
                             </div>
-                            <Textarea
-                              value={field.description}
-                              onChange={(e) => itineraryArray.update(index, { ...field, description: e.target.value })}
-                              placeholder={`Enter detailed description for day ${field.day}`}
-                              className="min-h-[100px]"
-                              disabled={isLoading}
+                            <FormField
+                              control={form.control}
+                              name={`itinerary.${index}.description`}
+                              render={({ field }) => (
+                                <FormControl>
+                                  <Textarea
+                                    value={field.value}
+                                    onChange={field.onChange}
+                                    placeholder={`Enter detailed description for day ${index + 1}`}
+                                    className="min-h-[100px]"
+                                    disabled={isLoading}
+                                  />
+                                </FormControl>
+                              )}
                             />
                           </div>
                         ))}
@@ -1417,10 +1423,61 @@ export default function EditPackagePage() {
                           <Button
                             size="sm"
                             className="mt-2"
+                            onClick={() => setExistingImages((prev) => ({ ...prev, cardImage: undefined }))}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            Remove Card Image
+                          </Button>
+                        )}
+                      </div>
+
+                      <div className="border rounded-md p-4 flex flex-col items-center justify-center min-h-[200px]">
+                        <div className="mb-4">
+                          {trekMap ? (
+                            <img
+                              src={URL.createObjectURL(trekMap) || "/placeholder.svg"}
+                              alt="Trek map preview"
+                              className="rounded-md object-cover h-[150px] w-[250px]"
+                            />
+                          ) : existingImages.trekMap ? (
+                            <img
+                              src={existingImages.trekMap || "/placeholder.svg"}
+                              alt="Trek map preview"
+                              className="rounded-md object-cover h-[150px] w-[250px]"
+                            />
+                          ) : (
+                            <img
+                              src="/placeholder.svg?height=150&width=250"
+                              alt="Trek map preview"
+                              className="rounded-md object-cover"
+                            />
+                          )}
+                        </div>
+                        <input
+                          type="file"
+                          ref={trekMapRef}
+                          onChange={handleTrekMapUpload}
+                          accept="image/*"
+                          className="hidden"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={isLoading}
+                          onClick={() => trekMapRef.current?.click()}
+                        >
+                          <Upload className="h-4 w-4 mr-2" />
+                          {existingImages.trekMap ? "Change Trek Map" : "Upload Trek Map"}
+                        </Button>
+                        {existingImages.trekMap && (
+                          <Button
+                            size="sm"
+                            className="mt-2"
                             onClick={() => setExistingImages((prev) => ({ ...prev, trekMap: undefined }))}
                           >
                             <Trash2 className="h-4 w-4 mr-2" />
-                            Remove Map
+                            Remove Trek Map
                           </Button>
                         )}
                       </div>

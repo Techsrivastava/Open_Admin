@@ -124,7 +124,10 @@ export const getPackageById = async (id: string): Promise<ApiResponse> => {
       city: rawData.city || "",
       state: rawData.state || "",
       region: rawData.region || "",
-      category: rawData.category || "",
+      // Extract category ID if it's a populated object, otherwise use as is
+      category: typeof rawData.category === 'object' && rawData.category?._id 
+        ? rawData.category._id 
+        : (rawData.category || ""),
       inclusions: Array.isArray(rawData.inclusions) ? rawData.inclusions : [],
       exclusions: Array.isArray(rawData.exclusions) ? rawData.exclusions : [],
       itinerary: Array.isArray(rawData.itinerary) ? rawData.itinerary.map((item: any) => ({
@@ -137,9 +140,20 @@ export const getPackageById = async (id: string): Promise<ApiResponse> => {
       isFeatured: Boolean(rawData.isFeatured),
       startDate: rawData.startDate || "",
       endDate: rawData.endDate || "",
-      howToReach: Array.isArray(rawData.howToReach) ? rawData.howToReach : [],
-      fitnessRequired: rawData.fitnessRequired || "",
-      cancellationPolicy: rawData.cancellationPolicy || "",
+      // Convert howToReach to array (backend might send string or array)
+      howToReach: Array.isArray(rawData.howToReach) 
+        ? rawData.howToReach 
+        : (typeof rawData.howToReach === 'string' && rawData.howToReach 
+            ? [rawData.howToReach] 
+            : []),
+      // Convert fitnessRequired to array (backend sends string)
+      fitnessRequired: typeof rawData.fitnessRequired === 'string' && rawData.fitnessRequired
+        ? [rawData.fitnessRequired]
+        : (Array.isArray(rawData.fitnessRequired) ? rawData.fitnessRequired : []),
+      // Convert cancellationPolicy to array (backend sends string)
+      cancellationPolicy: typeof rawData.cancellationPolicy === 'string' && rawData.cancellationPolicy
+        ? [rawData.cancellationPolicy]
+        : (Array.isArray(rawData.cancellationPolicy) ? rawData.cancellationPolicy : []),
       whatToCarry: Array.isArray(rawData.whatToCarry) ? rawData.whatToCarry : [],
       trekInfo: Array.isArray(rawData.trekInfo) ? rawData.trekInfo : [],
       batchDates: Array.isArray(rawData.batchDates) ? rawData.batchDates : [],

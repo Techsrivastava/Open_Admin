@@ -63,11 +63,17 @@ export const importPackagesFromCSV = async (csvFile: File): Promise<ApiResponse<
 
 export const createPackage = async (formData: FormData): Promise<ApiResponse> => {
   try {
+    console.log("📤 Creating package...")
+    
     const response = await axios.post(`${API_URL}/packages/create`, formData, {
       headers: {
         "Content-Type": "multipart/form-data",
       },
+      timeout: 30000, // 30 second timeout
     })
+    
+    console.log("✅ Package created successfully:", response.data)
+    
     return {
       success: true,
       data: response.data,
@@ -80,7 +86,17 @@ export const createPackage = async (formData: FormData): Promise<ApiResponse> =>
     if (error.response) {
       console.error("🚨 API Error Status:", error.response.status)
       console.error("🚨 API Error Data:", error.response.data)
-      errorMessage = error.response.data?.message || `Error ${error.response.status}: API request failed`
+      
+      // More specific error messages
+      if (error.response.status === 400) {
+        errorMessage = error.response.data?.message || "Invalid package data. Please check all required fields."
+      } else if (error.response.status === 413) {
+        errorMessage = "Files are too large. Please reduce image sizes."
+      } else if (error.response.status === 500) {
+        errorMessage = "Server error. Please try again later."
+      } else {
+        errorMessage = error.response.data?.message || `Error ${error.response.status}: API request failed`
+      }
     } else if (error.request) {
       console.error("❌ No Response Received from Server")
       errorMessage = "No response from server. Please check your internet connection."
@@ -182,21 +198,42 @@ export const getPackageById = async (id: string): Promise<ApiResponse> => {
 
 export const updatePackage = async (id: string, formData: FormData): Promise<ApiResponse> => {
   try {
+    console.log(`📤 Updating package ${id}...`)
+    
     const response = await axios.put(`${API_URL}/packages/${id}`, formData, {
       headers: {
         "Content-Type": "multipart/form-data",
       },
+      timeout: 30000, // 30 second timeout
     })
+    
+    console.log("✅ Package updated successfully:", response.data)
+    
     return {
       success: true,
       data: response.data,
       message: "Package updated successfully",
     }
   } catch (error: any) {
-    console.error(`Error updating package with ID ${id}:`, error)
+    console.error(`❌ Error updating package with ID ${id}:`, error)
+    
+    let errorMessage = "Failed to update package"
+    
+    if (error.response) {
+      if (error.response.status === 400) {
+        errorMessage = error.response.data?.message || "Invalid package data. Please check all required fields."
+      } else if (error.response.status === 404) {
+        errorMessage = "Package not found. It may have been deleted."
+      } else if (error.response.status === 413) {
+        errorMessage = "Files are too large. Please reduce image sizes."
+      } else {
+        errorMessage = error.response.data?.message || "Failed to update package"
+      }
+    }
+    
     return {
       success: false,
-      message: error.response?.data?.message || "Failed to update package",
+      message: errorMessage,
       error: error.response?.data || error,
     }
   }
