@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useState, useRef, useEffect } from "react"
 import { useRouter, useParams } from "next/navigation"
-import { useForm, useFieldArray } from "react-hook-form"
+import { useForm, useFieldArray, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -50,7 +50,7 @@ interface Package {
   maxParticipants?: string
   startDate?: string
   endDate?: string
-  howToReach?: string[]
+  howToReach?: { instruction: string }[]
   fitnessRequired?: string[]
   cancellationPolicy?: string[]
   whatToCarry?: any[]
@@ -83,6 +83,7 @@ export default function EditPackagePage() {
   const [trekMap, setTrekMap] = useState<File | null>(null)
   const [galleryImages, setGalleryImages] = useState<File[]>([])
   const [pdfFile, setPdfFile] = useState<File | null>(null)
+  const [removePdf, setRemovePdf] = useState(false)
   const [activeTab, setActiveTab] = useState("basic")
   const [categories, setCategories] = useState<any[]>([])
   const [isLoadingCategories, setIsLoadingCategories] = useState(false)
@@ -92,6 +93,15 @@ export default function EditPackagePage() {
     gallery?: string[]
   }>({})
   const [existingPdf, setExistingPdf] = useState<string | null>(null)
+  const [deletedImages, setDeletedImages] = useState<{
+    cardImage?: string
+    trekMap?: string
+    gallery?: string[]
+  }>({
+    cardImage: undefined,
+    trekMap: undefined,
+    gallery: []
+  })
 
   // Refs for file inputs
   const cardImageRef = useRef<HTMLInputElement>(null)
@@ -121,7 +131,7 @@ export default function EditPackagePage() {
       inclusions: [],
       exclusions: [],
       itinerary: [{ day: 1, title: "", description: "" }],
-      howToReach: [""],
+      howToReach: [{ instruction: "" }],
       fitnessRequired: [],
       cancellationPolicy: [],
       whatToCarry: [{ item: "" }],
@@ -145,6 +155,34 @@ export default function EditPackagePage() {
   const batchDatesArray = useFieldArray({ name: "batchDates", control: form.control })
   const additionalServicesArray = useFieldArray({ name: "additionalServices", control: form.control })
   const faqArray = useFieldArray({ name: "faq", control: form.control })
+  const howToReachArray = useFieldArray({ name: "howToReach", control: form.control })
+
+  // Watch trekInfo array for dynamic placeholders
+  const trekInfoWatch = useWatch({ control: form.control, name: "trekInfo" })
+
+  // Auto-renumber itinerary days
+  useEffect(() => {
+    itineraryArray.fields.forEach((field, index) => {
+      if (field.day !== index + 1) {
+        form.setValue(`itinerary.${index}.day`, index + 1)
+      }
+    })
+  }, [itineraryArray.fields, form])
+
+  // Debug environment variables
+  useEffect(() => {
+    console.log("🌐 Environment check:", {
+      NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || "Not set",
+    })
+  }, [])
+
+  // Debug form values
+  useEffect(() => {
+    const subscription = form.watch((value, { name, type }) => {
+      console.log("📝 Form field changed:", { name, type, value: value[name as keyof typeof value] })
+    })
+    return () => subscription.unsubscribe()
+  }, [form])
 
   // Fetch categories
   useEffect(() => {
@@ -172,39 +210,79 @@ export default function EditPackagePage() {
         })
         setExistingPdf(Array.isArray(pkg.pdf) ? pkg.pdf[0] : pkg.pdf || null)
 
-        // Reset form with fetched data and initialize field arrays
-        form.reset({
-          ...pkg,
+        // Reset form with fetched data
+        const formData = {
+          name: pkg.name || "",
+          description: pkg.description || "",
+          overview: pkg.overview || "",
+          duration: pkg.duration || "",
+          originalPrice: pkg.originalPrice || "",
+          offerPrice: pkg.offerPrice || "",
+          advancePayment: pkg.advancePayment || "",
+          city: pkg.city || "",
+          state: pkg.state || "",
+          region: pkg.region || "",
           category: pkg.category?._id || pkg.category || "",
-          // Ensure arrays are properly initialized
+          maxParticipants: pkg.maxParticipants || "",
+          isActive: pkg.isActive !== undefined ? pkg.isActive : true,
+          isFeatured: pkg.isFeatured !== undefined ? pkg.isFeatured : false,
+          startDate: pkg.startDate || "",
+          endDate: pkg.endDate || "",
           inclusions: Array.isArray(pkg.inclusions) ? pkg.inclusions : [],
           exclusions: Array.isArray(pkg.exclusions) ? pkg.exclusions : [],
-          itinerary: Array.isArray(pkg.itinerary) ? pkg.itinerary.map((item: any) => ({
-            day: Number(item.day) || 1,
-            title: item.title || "",
-            description: item.description || ""
-          })) : [{ day: 1, title: "", description: "" }],
-          howToReach: Array.isArray(pkg.howToReach) ? pkg.howToReach : [""],
+          itinerary: Array.isArray(pkg.itinerary) && pkg.itinerary.length > 0 
+            ? pkg.itinerary 
+            : [{ day: 1, title: "", description: "" }],
+          howToReach: Array.isArray(pkg.howToReach) && pkg.howToReach.length > 0 
+            ? pkg.howToReach.map((item: any) => 
+                typeof item === 'string' ? { instruction: item } : item
+              ) 
+            : [{ instruction: "" }],
           fitnessRequired: Array.isArray(pkg.fitnessRequired) ? pkg.fitnessRequired : [],
           cancellationPolicy: Array.isArray(pkg.cancellationPolicy) ? pkg.cancellationPolicy : [],
-          whatToCarry: Array.isArray(pkg.whatToCarry) ? pkg.whatToCarry.map((item: any) => ({
-            item: typeof item === 'string' ? item : item?.item || ""
-          })) : [{ item: "" }],
-          trekInfo: Array.isArray(pkg.trekInfo) ? pkg.trekInfo.map((info: any) => ({
-            title: info.title || "",
-            value: info.value || ""
-          })) : [],
+          whatToCarry: Array.isArray(pkg.whatToCarry) && pkg.whatToCarry.length > 0 
+            ? pkg.whatToCarry 
+            : [{ item: "" }],
+          trekInfo: Array.isArray(pkg.trekInfo) && pkg.trekInfo.length > 0 
+            ? pkg.trekInfo 
+            : [
+                { title: "Rail Head", value: "" },
+                { title: "Region", value: "" },
+                { title: "Airport", value: "" },
+                { title: "Base Camp", value: "" },
+                { title: "Best Season", value: "" },
+                { title: "Service From", value: "" },
+                { title: "Grade", value: "" },
+                { title: "Stay", value: "" },
+                { title: "Trail Type", value: "" },
+                { title: "Duration", value: "" },
+                { title: "Meals", value: "" },
+                { title: "Maximum Altitude", value: "" },
+                { title: "Approx Trekking KM", value: "" },
+              ],
           batchDates: Array.isArray(pkg.batchDates) ? pkg.batchDates : [],
           additionalServices: Array.isArray(pkg.additionalServices) ? pkg.additionalServices : [],
           faq: Array.isArray(pkg.faq) ? pkg.faq : [],
-        })
+          images: {
+            cardImage: pkg.images?.cardImage || "",
+            trekMap: pkg.images?.trekMap || "",
+            gallery: Array.isArray(pkg.images?.gallery) ? pkg.images.gallery : [],
+          },
+          pdf: Array.isArray(pkg.pdf) ? pkg.pdf : [],
+          tags: Array.isArray(pkg.tags) ? pkg.tags : [],
+          labels: Array.isArray(pkg.labels) ? pkg.labels : [],
+          isTrending: pkg.isTrending !== undefined ? pkg.isTrending : false,
+        }
+        
+        console.log("🔄 Resetting form with data:", formData)
+        form.reset(formData)
       } else {
         toast({ title: "Error", description: response.message || "Failed to fetch package data", variant: "destructive" })
         router.push("/dashboard/packages")
       }
       setIsLoadingPackage(false)
     }).catch(() => setIsLoadingPackage(false))
-  }, [packageId, router, toast, form.reset])
+  }, [packageId, router, toast, form])
 
   // Set default category after categories are loaded
   useEffect(() => {
@@ -222,14 +300,52 @@ export default function EditPackagePage() {
   }
   const handleGalleryUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      setGalleryImages(prev => [...prev, ...Array.from(e.target.files)]);
+      setGalleryImages(prev => [...prev, ...Array.from(e.target.files || [])])
     }
-  };
+  }
   const handlePdfUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files?.[0]) setPdfFile(e.target.files[0])
+    if (e.target.files?.[0]) {
+      setPdfFile(e.target.files[0])
+      setRemovePdf(false)
+    }
   }
   const removeGalleryImage = (index: number) => setGalleryImages(prev => prev.filter((_, i) => i !== index))
-  const removeExistingGalleryImage = (index: number) => setExistingImages(prev => ({ ...prev, gallery: prev.gallery?.filter((_, i) => i !== index) || [] }))
+  
+  const removeExistingGalleryImage = (index: number) => {
+    const imageToDelete = existingImages.gallery?.[index]
+    if (imageToDelete) {
+      // Add to deleted images list
+      setDeletedImages(prev => ({
+        ...prev,
+        gallery: [...(prev.gallery || []), imageToDelete]
+      }))
+      // Remove from existing images
+      setExistingImages(prev => ({ 
+        ...prev, 
+        gallery: prev.gallery?.filter((_, i) => i !== index) || [] 
+      }))
+    }
+  }
+
+  const removeExistingCardImage = () => {
+    if (existingImages.cardImage) {
+      setDeletedImages(prev => ({
+        ...prev,
+        cardImage: existingImages.cardImage
+      }))
+      setExistingImages(prev => ({ ...prev, cardImage: undefined }))
+    }
+  }
+
+  const removeExistingTrekMap = () => {
+    if (existingImages.trekMap) {
+      setDeletedImages(prev => ({
+        ...prev,
+        trekMap: existingImages.trekMap
+      }))
+      setExistingImages(prev => ({ ...prev, trekMap: undefined }))
+    }
+  }
 
   // Submit handler
   const onSubmit = async (data: PackageFormValues) => {
@@ -275,7 +391,17 @@ export default function EditPackagePage() {
       }
       if (pdfFile) {
         formData.append("pdf", pdfFile)
+        setRemovePdf(false)
       }
+      if (removePdf) {
+        formData.append("removePdf", "true")
+      }
+      
+      // Send deleted images for backend cleanup
+      if (deletedImages.cardImage || deletedImages.trekMap || (deletedImages.gallery && deletedImages.gallery.length > 0)) {
+        formData.append("deletedImages", JSON.stringify(deletedImages))
+      }
+      
       formData.append("images", JSON.stringify(imagesData))
       const response = await updatePackage(packageId, formData)
       if (response.success) {
@@ -421,7 +547,7 @@ export default function EditPackagePage() {
                           <FormItem>
                             <FormLabel>Max Participants</FormLabel>
                             <FormControl>
-                              <Input placeholder="e.g. 20" {...field} disabled={isLoading} />
+                              <Input type="number" placeholder="e.g. 20" {...field} disabled={isLoading} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -479,7 +605,7 @@ export default function EditPackagePage() {
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Category</FormLabel>
-                          <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isLoading}>
+                          <Select value={field.value} onValueChange={field.onChange} disabled={isLoading}>
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue placeholder="Select category" />
@@ -516,7 +642,7 @@ export default function EditPackagePage() {
                           <FormItem>
                             <FormLabel>Original Price (₹)</FormLabel>
                             <FormControl>
-                              <Input placeholder="e.g. 24500" {...field} disabled={isLoading} />
+                              <Input type="number" placeholder="e.g. 24500" {...field} disabled={isLoading} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -530,7 +656,7 @@ export default function EditPackagePage() {
                           <FormItem>
                             <FormLabel>Offer Price (₹)</FormLabel>
                             <FormControl>
-                              <Input placeholder="e.g. 19999" {...field} disabled={isLoading} />
+                              <Input type="number" placeholder="e.g. 19999" {...field} disabled={isLoading} />
                             </FormControl>
                             <FormDescription>Leave empty if no special offer</FormDescription>
                             <FormMessage />
@@ -545,7 +671,7 @@ export default function EditPackagePage() {
                           <FormItem>
                             <FormLabel>Advance Payment (₹)</FormLabel>
                             <FormControl>
-                              <Input placeholder="e.g. 5000" {...field} disabled={isLoading} />
+                              <Input type="number" placeholder="e.g. 5000" {...field} disabled={isLoading} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -625,12 +751,13 @@ export default function EditPackagePage() {
                           <FormLabel>Tags</FormLabel>
                           <FormControl>
                             <Input
-                              placeholder="Comma separated tags"
+                              placeholder="e.g. Adventure, Family, Weekend"
                               value={field.value ? field.value.join(", ") : ""}
-                              onChange={e => field.onChange(e.target.value.split(",").map(tag => tag.trim()))}
+                              onChange={e => field.onChange(e.target.value.split(",").map(tag => tag.trim()).filter(Boolean))}
+                              disabled={isLoading}
                             />
                           </FormControl>
-                          <FormDescription>e.g. Adventure, Family, Weekend</FormDescription>
+                          <FormDescription>Comma separated tags</FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -642,7 +769,7 @@ export default function EditPackagePage() {
                       render={({ field }) => (
                         <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
                           <FormControl>
-                            <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                            <Checkbox checked={field.value} onCheckedChange={field.onChange} disabled={isLoading} />
                           </FormControl>
                           <div className="space-y-1 leading-none">
                             <FormLabel>Trending</FormLabel>
@@ -660,12 +787,13 @@ export default function EditPackagePage() {
                           <FormLabel>Labels</FormLabel>
                           <FormControl>
                             <Input
-                              placeholder="Comma separated labels"
+                              placeholder="e.g. All Girls Trip, Weekend Escape"
                               value={field.value ? field.value.join(", ") : ""}
-                              onChange={e => field.onChange(e.target.value.split(",").map(l => l.trim()))}
+                              onChange={e => field.onChange(e.target.value.split(",").map(l => l.trim()).filter(Boolean))}
+                              disabled={isLoading}
                             />
                           </FormControl>
-                          <FormDescription>e.g. All Girls Trip, Weekend Escape</FormDescription>
+                          <FormDescription>Comma separated labels</FormDescription>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -703,12 +831,13 @@ export default function EditPackagePage() {
                           <FormLabel>Inclusions</FormLabel>
                           <FormControl>
                             <Textarea
-                              placeholder="Enter what's included in the package"
+                              placeholder="Enter what's included in the package, one per line"
                               className="min-h-[100px]"
                               disabled={isLoading}
                               value={field.value ? field.value.join("\n") : ""}
                               onChange={(e) => {
-                                field.onChange(e.target.value.split("\n").map((item) => item.trim())) // Convert to array
+                                const lines = e.target.value.split("\n").map((item) => item.trim()).filter(Boolean)
+                                field.onChange(lines)
                               }}
                             />
                           </FormControl>
@@ -727,12 +856,13 @@ export default function EditPackagePage() {
                           <FormLabel>Exclusions</FormLabel>
                           <FormControl>
                             <Textarea
-                              placeholder="Enter what's not included in the package"
+                              placeholder="Enter what's not included in the package, one per line"
                               className="min-h-[100px]"
                               disabled={isLoading}
                               value={field.value ? field.value.join("\n") : ""}
                               onChange={(e) => {
-                                field.onChange(e.target.value.split("\n").map((item) => item.trim())) // Convert to array
+                                const lines = e.target.value.split("\n").map((item) => item.trim()).filter(Boolean)
+                                field.onChange(lines)
                               }}
                             />
                           </FormControl>
@@ -755,20 +885,21 @@ export default function EditPackagePage() {
                         {itineraryArray.fields.map((field, index) => (
                           <div key={field.id} className="grid gap-4">
                             <div className="flex items-center gap-2">
-                              <span className="font-medium min-w-[80px]">Day {index + 1}</span>
+                              <span className="font-medium min-w-[80px]">Day {field.day}</span>
                               <FormField
                                 control={form.control}
                                 name={`itinerary.${index}.title`}
-                                render={({ field }) => (
-                                  <FormControl>
-                                    <Input
-                                      value={field.value}
-                                      onChange={field.onChange}
-                                      placeholder={`Enter day ${index + 1} title`}
-                                      className="flex-1"
-                                      disabled={isLoading}
-                                    />
-                                  </FormControl>
+                                render={({ field: titleField }) => (
+                                  <FormItem className="flex-1">
+                                    <FormControl>
+                                      <Input
+                                        placeholder={`Enter day ${field.day} title`}
+                                        {...titleField}
+                                        disabled={isLoading}
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
                                 )}
                               />
                               <Button
@@ -784,16 +915,18 @@ export default function EditPackagePage() {
                             <FormField
                               control={form.control}
                               name={`itinerary.${index}.description`}
-                              render={({ field }) => (
-                                <FormControl>
-                                  <Textarea
-                                    value={field.value}
-                                    onChange={field.onChange}
-                                    placeholder={`Enter detailed description for day ${index + 1}`}
-                                    className="min-h-[100px]"
-                                    disabled={isLoading}
-                                  />
-                                </FormControl>
+                              render={({ field: descField }) => (
+                                <FormItem>
+                                  <FormControl>
+                                    <Textarea
+                                      placeholder={`Enter detailed description for day ${field.day}`}
+                                      className="min-h-[100px]"
+                                      {...descField}
+                                      disabled={isLoading}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
                               )}
                             />
                           </div>
@@ -804,23 +937,23 @@ export default function EditPackagePage() {
                     <div>
                       <div className="flex items-center justify-between mb-4">
                         <FormLabel className="text-base">How to Reach</FormLabel>
-                        <Button type="button" variant="outline" size="sm" onClick={() => form.setValue("howToReach", [...form.getValues("howToReach"), ""])}>
+                        <Button type="button" variant="outline" size="sm" onClick={() => howToReachArray.append({ instruction: "" })} disabled={isLoading}>
                           <Plus className="h-4 w-4 mr-2" />
                           Add Instruction
                         </Button>
                       </div>
-                      {form.getValues("howToReach").map((howToReachItem, index) => (
-                        <div key={index} className="flex items-center gap-2 mb-2">
+                      {howToReachArray.fields.map((field, index) => (
+                        <div key={field.id} className="flex items-center gap-2 mb-2">
                           <FormField
                             control={form.control}
-                            name={`howToReach.${index}`}
-                            render={({ field }) => (
+                            name={`howToReach.${index}.instruction`}
+                            render={({ field: fieldProps }) => (
                               <FormItem className="flex-1">
                                 <FormControl>
                                   <Textarea
                                     placeholder="Enter instruction on how to reach the destination"
                                     className="min-h-[100px]"
-                                    {...field}
+                                    {...fieldProps}
                                     disabled={isLoading}
                                   />
                                 </FormControl>
@@ -832,10 +965,10 @@ export default function EditPackagePage() {
                             type="button"
                             variant="ghost"
                             size="icon"
-                            onClick={() => form.setValue("howToReach", form.getValues("howToReach").filter((_, i) => i !== index))}
-                            disabled={form.getValues("howToReach").length === 1}
+                            onClick={() => howToReachArray.remove(index)}
+                            disabled={isLoading}
                           >
-                            <Trash className="h-4 w-4" />
+                            <X className="h-4 w-4" />
                           </Button>
                         </div>
                       ))}
@@ -849,12 +982,13 @@ export default function EditPackagePage() {
                           <FormLabel>Fitness Required</FormLabel>
                           <FormControl>
                             <Textarea
-                              placeholder="Enter fitness requirements for the package"
+                              placeholder="Enter fitness requirements for the package, one per line"
                               className="min-h-[100px]"
                               disabled={isLoading}
                               value={field.value ? field.value.join("\n") : ""}
                               onChange={(e) => {
-                                field.onChange(e.target.value.split("\n").map((item) => item.trim()))
+                                const lines = e.target.value.split("\n").map((item) => item.trim()).filter(Boolean)
+                                field.onChange(lines)
                               }}
                             />
                           </FormControl>
@@ -872,12 +1006,13 @@ export default function EditPackagePage() {
                           <FormLabel>Cancellation Policy</FormLabel>
                           <FormControl>
                             <Textarea
-                              placeholder="Enter cancellation policy details"
+                              placeholder="Enter cancellation policy details, one per line"
                               className="min-h-[100px]"
                               disabled={isLoading}
                               value={field.value ? field.value.join("\n") : ""}
                               onChange={(e) => {
-                                field.onChange(e.target.value.split("\n").map((item) => item.trim()))
+                                const lines = e.target.value.split("\n").map((item) => item.trim()).filter(Boolean)
+                                field.onChange(lines)
                               }}
                             />
                           </FormControl>
@@ -895,6 +1030,7 @@ export default function EditPackagePage() {
                           variant="outline"
                           size="sm"
                           onClick={() => whatToCarryArray.append({ item: "" })}
+                          disabled={isLoading}
                         >
                           <Plus className="h-4 w-4 mr-2" />
                           Add Item
@@ -935,6 +1071,7 @@ export default function EditPackagePage() {
                           variant="outline"
                           size="sm"
                           onClick={() => faqArray.append({ question: "", answer: "" })}
+                          disabled={isLoading}
                         >
                           <Plus className="h-4 w-4 mr-2" />
                           Add FAQ
@@ -949,8 +1086,12 @@ export default function EditPackagePage() {
                                 type="button"
                                 variant="ghost"
                                 size="icon"
-                                onClick={() => faqArray.remove(index)}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  faqArray.remove(index)
+                                }}
                                 className="mr-2"
+                                disabled={isLoading}
                               >
                                 <Trash className="h-4 w-4" />
                               </Button>
@@ -1028,6 +1169,7 @@ export default function EditPackagePage() {
                               availability: true,
                             })
                           }
+                          disabled={isLoading}
                         >
                           <Calendar className="h-4 w-4 mr-2" />
                           Add Batch
@@ -1044,7 +1186,7 @@ export default function EditPackagePage() {
                                   variant="ghost"
                                   size="icon"
                                   onClick={() => batchDatesArray.remove(index)}
-                                  disabled={batchDatesArray.fields.length === 1}
+                                  disabled={batchDatesArray.fields.length === 1 || isLoading}
                                 >
                                   <Trash className="h-4 w-4" />
                                 </Button>
@@ -1087,7 +1229,7 @@ export default function EditPackagePage() {
                                     <FormItem>
                                       <FormLabel>Price (₹)</FormLabel>
                                       <FormControl>
-                                        <Input placeholder="e.g. 24500" {...field} disabled={isLoading} />
+                                        <Input type="number" placeholder="e.g. 24500" {...field} disabled={isLoading} />
                                       </FormControl>
                                       <FormMessage />
                                     </FormItem>
@@ -1134,6 +1276,7 @@ export default function EditPackagePage() {
                               isOptional: true,
                             })
                           }
+                          disabled={isLoading}
                         >
                           <Plus className="h-4 w-4 mr-2" />
                           Add Service
@@ -1150,6 +1293,7 @@ export default function EditPackagePage() {
                                   variant="ghost"
                                   size="icon"
                                   onClick={() => additionalServicesArray.remove(index)}
+                                  disabled={isLoading}
                                 >
                                   <Trash className="h-4 w-4" />
                                 </Button>
@@ -1194,7 +1338,7 @@ export default function EditPackagePage() {
                                     <FormItem>
                                       <FormLabel>Price (₹)</FormLabel>
                                       <FormControl>
-                                        <Input placeholder="e.g. 1500" {...field} disabled={isLoading} />
+                                        <Input type="number" placeholder="e.g. 1500" {...field} disabled={isLoading} />
                                       </FormControl>
                                       <FormMessage />
                                     </FormItem>
@@ -1257,108 +1401,117 @@ export default function EditPackagePage() {
                           variant="outline"
                           size="sm"
                           onClick={() => trekInfoArray.append({ title: "", value: "" })}
+                          disabled={isLoading}
                         >
                           <Plus className="mr-2 h-4 w-4" />
                           Add Trek Info
                         </Button>
                       </div>
 
-                      {trekInfoArray.fields.map((field, index) => (
-                        <div key={field.id} className="flex items-start gap-4 rounded-lg border p-4">
-                          <div className="grid w-full grid-cols-12 gap-4">
-                            <div className="col-span-4">
-                              <FormField
-                                control={form.control}
-                                name={`trekInfo.${index}.title`}
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>Title</FormLabel>
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      {trekInfoArray.fields.map((field, index) => {
+                        const currentTitle = trekInfoWatch?.[index]?.title || field.title
+                        const getPlaceholder = (title: string) => {
+                          switch (title) {
+                            case "Rail Head":
+                              return "e.g. Haridwar Railway Station"
+                            case "Region":
+                              return "e.g. Garhwal Himalayas"
+                            case "Airport":
+                              return "e.g. Jolly Grant Airport, Dehradun"
+                            case "Base Camp":
+                              return "e.g. Sankri Village"
+                            case "Best Season":
+                              return "e.g. April to June, September to November"
+                            case "Service From":
+                              return "e.g. Dehradun"
+                            case "Grade":
+                              return "e.g. Moderate"
+                            case "Stay":
+                              return "e.g. Tents and Guest Houses"
+                            case "Trail Type":
+                              return "e.g. Forest, Meadows, Snow"
+                            case "Duration":
+                              return "e.g. 7 Days"
+                            case "Meals":
+                              return "e.g. Vegetarian Meals"
+                            case "Maximum Altitude":
+                              return "e.g. 12,500 ft"
+                            case "Approx Trekking KM":
+                              return "e.g. 45 KM"
+                            case "Fitness Required":
+                              return "e.g. Moderate to High"
+                            default:
+                              return "Enter value"
+                          }
+                        }
+                        return (
+                          <div key={field.id} className="flex items-start gap-4 rounded-lg border p-4">
+                            <div className="grid w-full grid-cols-12 gap-4">
+                              <div className="col-span-4">
+                                <FormField
+                                  control={form.control}
+                                  name={`trekInfo.${index}.title`}
+                                  render={({ field: titleField }) => (
+                                    <FormItem>
+                                      <FormLabel>Title</FormLabel>
+                                      <Select value={titleField.value} onValueChange={titleField.onChange} disabled={isLoading}>
+                                        <FormControl>
+                                          <SelectTrigger>
+                                            <SelectValue placeholder="Select a title" />
+                                          </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                          <SelectItem value="Rail Head">Rail Head</SelectItem>
+                                          <SelectItem value="Region">Region</SelectItem>
+                                          <SelectItem value="Airport">Airport</SelectItem>
+                                          <SelectItem value="Base Camp">Base Camp</SelectItem>
+                                          <SelectItem value="Best Season">Best Season</SelectItem>
+                                          <SelectItem value="Service From">Service From</SelectItem>
+                                          <SelectItem value="Grade">Grade</SelectItem>
+                                          <SelectItem value="Stay">Stay</SelectItem>
+                                          <SelectItem value="Trail Type">Trail Type</SelectItem>
+                                          <SelectItem value="Duration">Duration</SelectItem>
+                                          <SelectItem value="Meals">Meals</SelectItem>
+                                          <SelectItem value="Maximum Altitude">Maximum Altitude</SelectItem>
+                                          <SelectItem value="Approx Trekking KM">Approx Trekking KM</SelectItem>
+                                          <SelectItem value="Fitness Required">Fitness Required</SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              </div>
+
+                              <div className="col-span-7">
+                                <FormField
+                                  control={form.control}
+                                  name={`trekInfo.${index}.value`}
+                                  render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel>Value</FormLabel>
                                       <FormControl>
-                                        <SelectTrigger>
-                                          <SelectValue placeholder="Select a title" />
-                                        </SelectTrigger>
+                                        <Input
+                                          placeholder={getPlaceholder(currentTitle || "")}
+                                          {...field}
+                                          disabled={isLoading}
+                                        />
                                       </FormControl>
-                                      <SelectContent>
-                                        <SelectItem value="Rail Head">Rail Head</SelectItem>
-                                        <SelectItem value="Region">Region</SelectItem>
-                                        <SelectItem value="Airport">Airport</SelectItem>
-                                        <SelectItem value="Base Camp">Base Camp</SelectItem>
-                                        <SelectItem value="Best Season">Best Season</SelectItem>
-                                        <SelectItem value="Service From">Service From</SelectItem>
-                                        <SelectItem value="Grade">Grade</SelectItem>
-                                        <SelectItem value="Stay">Stay</SelectItem>
-                                        <SelectItem value="Trail Type">Trail Type</SelectItem>
-                                        <SelectItem value="Duration">Duration</SelectItem>
-                                        <SelectItem value="Meals">Meals</SelectItem>
-                                        <SelectItem value="Maximum Altitude">Maximum Altitude</SelectItem>
-                                        <SelectItem value="Approx Trekking KM">Approx Trekking KM</SelectItem>
-                                        <SelectItem value="Fitness Required">Fitness Required</SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                            </div>
+                                      <FormMessage />
+                                    </FormItem>
+                                  )}
+                                />
+                              </div>
 
-                            <div className="col-span-7">
-                              <FormField
-                                control={form.control}
-                                name={`trekInfo.${index}.value`}
-                                render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel>Value</FormLabel>
-                                    <FormControl>
-                                      <Input
-                                        placeholder={
-                                          field.value === "Rail Head"
-                                            ? "e.g. Haridwar Railway Station"
-                                            : field.value === "Region"
-                                              ? "e.g. Garhwal Himalayas"
-                                              : field.value === "Airport"
-                                                ? "e.g. Jolly Grant Airport, Dehradun"
-                                                : field.value === "Base Camp"
-                                                  ? "e.g. Sankri Village"
-                                                  : field.value === "Best Season"
-                                                    ? "e.g. April to June, September to November"
-                                                    : field.value === "Service From"
-                                                      ? "e.g. Dehradun"
-                                                      : field.value === "Grade"
-                                                        ? "e.g. Moderate"
-                                                        : field.value === "Stay"
-                                                          ? "e.g. Tents and Guest Houses"
-                                                          : field.value === "Trail Type"
-                                                            ? "e.g. Forest, Meadows, Snow"
-                                                            : field.value === "Duration"
-                                                              ? "e.g. 7 Days"
-                                                              : field.value === "Meals"
-                                                                ? "e.g. Vegetarian Meals"
-                                                                : field.value === "Maximum Altitude"
-                                                                  ? "e.g. 12,500 ft"
-                                                                  : field.value === "Approx Trekking KM"
-                                                                    ? "e.g. 45 KM"
-                                                                    : field.value === "Fitness Required"
-                                                                      ? "e.g. Moderate to High"
-                                                                      : "Enter value"
-                                        }
-                                        {...field}
-                                      />
-                                    </FormControl>
-                                    <FormMessage />
-                                  </FormItem>
-                                )}
-                              />
-                            </div>
-
-                            <div className="col-span-1 flex items-end">
-                              <Button type="button" variant="ghost" size="icon" onClick={() => trekInfoArray.remove(index)}>
-                                <Trash className="h-4 w-4" />
-                              </Button>
+                              <div className="col-span-1 flex items-end">
+                                <Button type="button" variant="ghost" size="icon" onClick={() => trekInfoArray.remove(index)} disabled={isLoading}>
+                                  <Trash className="h-4 w-4" />
+                                </Button>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        )
+                      })}
                     </div>
                   </CardContent>
                   <CardFooter className="flex justify-between">
@@ -1380,26 +1533,25 @@ export default function EditPackagePage() {
                   </CardHeader>
                   <CardContent>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      {/* Card Image */}
                       <div className="border rounded-md p-4 flex flex-col items-center justify-center min-h-[200px]">
                         <div className="mb-4">
                           {cardImage ? (
                             <img
-                              src={URL.createObjectURL(cardImage) || "/placeholder.svg"}
+                              src={URL.createObjectURL(cardImage)}
                               alt="Package preview"
                               className="rounded-md object-cover h-[150px] w-[250px]"
                             />
                           ) : existingImages.cardImage ? (
                             <img
-                              src={existingImages.cardImage || "/placeholder.svg"}
+                              src={existingImages.cardImage}
                               alt="Package preview"
                               className="rounded-md object-cover h-[150px] w-[250px]"
                             />
                           ) : (
-                            <img
-                              src="/placeholder.svg?height=150&width=250"
-                              alt="Package preview"
-                              className="rounded-md object-cover"
-                            />
+                            <div className="h-[150px] w-[250px] rounded-md bg-muted flex items-center justify-center">
+                              <FileText className="h-8 w-8 text-muted-foreground" />
+                            </div>
                           )}
                         </div>
                         <input
@@ -1419,11 +1571,12 @@ export default function EditPackagePage() {
                           <Upload className="h-4 w-4 mr-2" />
                           {existingImages.cardImage ? "Change Card Image" : "Upload Card Image"}
                         </Button>
-                        {existingImages.cardImage && (
+                        {existingImages.cardImage && !cardImage && (
                           <Button
                             size="sm"
+                            variant="destructive"
                             className="mt-2"
-                            onClick={() => setExistingImages((prev) => ({ ...prev, cardImage: undefined }))}
+                            onClick={removeExistingCardImage}
                           >
                             <Trash2 className="h-4 w-4 mr-2" />
                             Remove Card Image
@@ -1435,22 +1588,20 @@ export default function EditPackagePage() {
                         <div className="mb-4">
                           {trekMap ? (
                             <img
-                              src={URL.createObjectURL(trekMap) || "/placeholder.svg"}
+                              src={URL.createObjectURL(trekMap)}
                               alt="Trek map preview"
                               className="rounded-md object-cover h-[150px] w-[250px]"
                             />
                           ) : existingImages.trekMap ? (
                             <img
-                              src={existingImages.trekMap || "/placeholder.svg"}
+                              src={existingImages.trekMap}
                               alt="Trek map preview"
                               className="rounded-md object-cover h-[150px] w-[250px]"
                             />
                           ) : (
-                            <img
-                              src="/placeholder.svg?height=150&width=250"
-                              alt="Trek map preview"
-                              className="rounded-md object-cover"
-                            />
+                            <div className="h-[150px] w-[250px] rounded-md bg-muted flex items-center justify-center">
+                              <FileText className="h-8 w-8 text-muted-foreground" />
+                            </div>
                           )}
                         </div>
                         <input
@@ -1470,11 +1621,12 @@ export default function EditPackagePage() {
                           <Upload className="h-4 w-4 mr-2" />
                           {existingImages.trekMap ? "Change Trek Map" : "Upload Trek Map"}
                         </Button>
-                        {existingImages.trekMap && (
+                        {existingImages.trekMap && !trekMap && (
                           <Button
                             size="sm"
+                            variant="destructive"
                             className="mt-2"
-                            onClick={() => setExistingImages((prev) => ({ ...prev, trekMap: undefined }))}
+                            onClick={removeExistingTrekMap}
                           >
                             <Trash2 className="h-4 w-4 mr-2" />
                             Remove Trek Map
@@ -1482,6 +1634,7 @@ export default function EditPackagePage() {
                         )}
                       </div>
 
+                      {/* Gallery */}
                       <div className="border border-dashed rounded-md p-4 flex flex-col items-center justify-center min-h-[200px]">
                         <input
                           type="file"
@@ -1499,8 +1652,9 @@ export default function EditPackagePage() {
                           onClick={() => galleryRef.current?.click()}
                         >
                           <Upload className="h-4 w-4 mr-2" />
-                          Add Gallery Image
+                          Add Gallery Images
                         </Button>
+                        <p className="text-xs text-muted-foreground mt-2 text-center">Select multiple images</p>
                       </div>
                     </div>
 
@@ -1512,7 +1666,7 @@ export default function EditPackagePage() {
                           {existingImages.gallery.map((image, index) => (
                             <div key={`existing-${index}`} className="relative group">
                               <img
-                                src={image || "/placeholder.svg"}
+                                src={image}
                                 alt={`Gallery image ${index + 1}`}
                                 className="h-24 w-full object-cover rounded-md"
                               />
@@ -1522,6 +1676,7 @@ export default function EditPackagePage() {
                                 size="icon"
                                 className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
                                 onClick={() => removeExistingGalleryImage(index)}
+                                disabled={isLoading}
                               >
                                 <X className="h-3 w-3" />
                               </Button>
@@ -1539,7 +1694,7 @@ export default function EditPackagePage() {
                           {galleryImages.map((image, index) => (
                             <div key={`new-${index}`} className="relative group">
                               <img
-                                src={URL.createObjectURL(image) || "/placeholder.svg"}
+                                src={URL.createObjectURL(image)}
                                 alt={`Gallery image ${index + 1}`}
                                 className="h-24 w-full object-cover rounded-md"
                               />
@@ -1549,6 +1704,7 @@ export default function EditPackagePage() {
                                 size="icon"
                                 className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
                                 onClick={() => removeGalleryImage(index)}
+                                disabled={isLoading}
                               >
                                 <X className="h-3 w-3" />
                               </Button>
@@ -1567,7 +1723,7 @@ export default function EditPackagePage() {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
-                      {existingPdf && (
+                      {existingPdf && !removePdf && (
                         <div className="flex items-center justify-between p-3 border rounded-md">
                           <div className="flex items-center gap-3">
                             <FileText className="h-5 w-5 text-blue-500" />
@@ -1576,7 +1732,16 @@ export default function EditPackagePage() {
                               <p className="text-xs text-muted-foreground">{existingPdf.split("/").pop()}</p>
                             </div>
                           </div>
-                          <Button type="button" variant="ghost" size="icon" onClick={() => setExistingPdf(null)}>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                              setExistingPdf(null)
+                              setRemovePdf(true)
+                            }}
+                            disabled={isLoading}
+                          >
                             <X className="h-4 w-4" />
                           </Button>
                         </div>
@@ -1593,9 +1758,15 @@ export default function EditPackagePage() {
                               </p>
                             </div>
                           </div>
-                          <Button type="button" variant="ghost" size="icon" onClick={() => setPdfFile(null)}>
+                          <Button type="button" variant="ghost" size="icon" onClick={() => setPdfFile(null)} disabled={isLoading}>
                             <X className="h-4 w-4" />
                           </Button>
+                        </div>
+                      )}
+
+                      {removePdf && (
+                        <div className="p-3 border rounded-md bg-destructive/10 text-destructive-foreground">
+                          <p className="text-sm">PDF document has been removed.</p>
                         </div>
                       )}
 
@@ -1604,13 +1775,13 @@ export default function EditPackagePage() {
                         type="button"
                         variant="outline"
                         onClick={() => pdfRef.current?.click()}
-                        disabled={isLoading || (!!pdfFile && !!existingPdf)}
+                        disabled={isLoading || Boolean(pdfFile && existingPdf && !removePdf)}
                       >
                         <Upload className="h-4 w-4 mr-2" />
-                        {existingPdf ? "Replace PDF Document" : "Upload PDF Document"}
+                        {existingPdf && !removePdf ? "Replace PDF Document" : "Upload PDF Document"}
                       </Button>
                       <p className="text-sm text-muted-foreground">
-                        Upload brochures, itineraries, terms & conditions, or any other relevant documents.
+                        Upload brochures, itineraries, terms & conditions, or any other relevant documents. Max size: 10MB.
                       </p>
                     </div>
                   </CardContent>
@@ -1621,8 +1792,8 @@ export default function EditPackagePage() {
                     <Button type="submit" disabled={isLoading} className="min-w-[100px]">
                       {isLoading ? (
                         <>
-                          <span className="mr-2">Updating...</span>
-                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-background border-t-foreground" />
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Updating...
                         </>
                       ) : (
                         "Update Package"

@@ -27,7 +27,7 @@ export interface PackageFormData {
   isFeatured: boolean
   startDate?: string
   endDate?: string
-  howToReach: string[]
+  howToReach: { instruction: string }[]
   fitnessRequired?: string
   cancellationPolicy?: string
   whatToCarry: string[]

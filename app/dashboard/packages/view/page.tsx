@@ -61,7 +61,7 @@ interface PackageDetails {
   isFeatured: boolean
   startDate?: string
   endDate?: string
-  howToReach?: string
+  howToReach?: { instruction: string }[]
   fitnessRequired?: string
   cancellationPolicy?: string
   whatToCarry: { item: string }[]
@@ -247,7 +247,17 @@ export default function ViewPackagePage() {
                   <div className="space-y-4">
                     <div>
                       <h3 className="font-semibold mb-2">How to Reach</h3>
-                      <p className="text-muted-foreground">{packageDetails.howToReach}</p>
+                      <div className="space-y-2">
+                        {Array.isArray(packageDetails.howToReach) ? (
+                          packageDetails.howToReach.map((item, index) => (
+                            <p key={index} className="text-muted-foreground">
+                              {typeof item === 'string' ? item : item.instruction}
+                            </p>
+                          ))
+                        ) : (
+                          <p className="text-muted-foreground">{packageDetails.howToReach}</p>
+                        )}
+                      </div>
                     </div>
                     <div>
                       <h3 className="font-semibold mb-2">Fitness Required</h3>

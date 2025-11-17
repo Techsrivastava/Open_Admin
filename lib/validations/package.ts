@@ -25,7 +25,7 @@ export const packageFormSchema = z.object({
   isFeatured: z.boolean(),
   startDate: z.string().optional(),
   endDate: z.string().optional(),
-  howToReach: z.array(z.string()),
+  howToReach: z.array(z.object({ instruction: z.string() })),
   fitnessRequired: z.array(z.string()),
   cancellationPolicy: z.array(z.string()),
   whatToCarry: z.array(z.object({ item: z.string() })),

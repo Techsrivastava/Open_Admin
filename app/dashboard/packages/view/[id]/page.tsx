@@ -28,7 +28,7 @@ interface PackageData {
   isFeatured: boolean
   startDate?: string
   endDate?: string
-  howToReach?: string
+  howToReach?: { instruction: string }[]
   fitnessRequired?: string
   cancellationPolicy?: string
   whatToCarry: { item: string }[]
@@ -432,7 +432,17 @@ export default function PackageView() {
                   <CardTitle>How to Reach</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-muted-foreground">{packageData.howToReach}</p>
+                  <div className="space-y-2">
+                    {Array.isArray(packageData.howToReach) ? (
+                      packageData.howToReach.map((item, index) => (
+                        <p key={index} className="text-muted-foreground">
+                          {typeof item === 'string' ? item : item.instruction}
+                        </p>
+                      ))
+                    ) : (
+                      <p className="text-muted-foreground">{packageData.howToReach}</p>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
 
