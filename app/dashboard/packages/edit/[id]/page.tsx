@@ -353,9 +353,18 @@ export default function EditPackagePage() {
       setIsLoading(true)
       const formData = new FormData()
       formData.append("_id", packageId)
-      Object.keys(data).forEach((key) => {
+      
+      // Transform howToReach from array of objects to array of strings
+      const preparedData = { ...data }
+      if (Array.isArray(preparedData.howToReach) && preparedData.howToReach.length > 0) {
+        preparedData.howToReach = preparedData.howToReach.map((item: any) => 
+          typeof item === 'object' && item.instruction ? item.instruction : item
+        ) as any
+      }
+      
+      Object.keys(preparedData).forEach((key) => {
         if (key !== "images" && key !== "pdf") {
-          const value = data[key as keyof PackageFormValues]
+          const value = preparedData[key as keyof PackageFormValues]
           if (value !== undefined && value !== null) {
             if (Array.isArray(value) || (typeof value === "object" && value !== null)) {
               formData.append(key, JSON.stringify(value))
@@ -365,6 +374,7 @@ export default function EditPackagePage() {
           }
         }
       })
+
       // Images
       const imagesData: any = {
         cardImage: existingImages.cardImage || "",
