@@ -11,8 +11,9 @@ import { toast } from "sonner"
 import CharDhamFormModal from "./char-dham-form-modal"
 
 interface CharDhamPackage {
-  id: string
-  packageId: string
+  _id?: string
+  id?: string
+  packageId?: string
   title: string
   overview: string
   difficulty: "Easy" | "Moderate" | "Challenging" | "Expert"
@@ -64,8 +65,9 @@ export default function CharDhamView() {
       if (!response.ok) {
         throw new Error('Failed to fetch packages')
       }
-      const data = await response.json()
-      setPackages(data)
+      const responseBody = await response.json()
+      const data = responseBody?.data ?? []
+      setPackages(Array.isArray(data) ? data : [])
     } catch (error) {
       console.error('Error fetching packages:', error)
       toast.error('Failed to fetch packages')
@@ -126,14 +128,27 @@ export default function CharDhamView() {
 
   const handleSubmitPackage = async (formData: any) => {
     try {
+      const normalizedData = {
+        ...formData,
+        packageInfo: formData.packageInfo || { title: formData.title || "", data: {} },
+        cardImage: formData.cardImage || "",
+        gallery: Array.isArray(formData.gallery) ? formData.gallery : [],
+        pdfFiles: Array.isArray(formData.pdfFiles) ? formData.pdfFiles : [],
+        status: formData.status || "Draft"
+      }
+
       if (editingPackage) {
         // Update existing package
-        const response = await fetch(`https://openbacken-production.up.railway.app/api/char-dham/${editingPackage.id}`, {
+        const packageId = (editingPackage as any)._id || (editingPackage as any).id
+        if (!packageId) {
+          throw new Error('Package ID is missing for update')
+        }
+        const response = await fetch(`https://openbacken-production.up.railway.app/api/char-dham/${packageId}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify(formData),
+          body: JSON.stringify(normalizedData),
         })
         if (!response.ok) {
           throw new Error('Failed to update package')
@@ -146,7 +161,7 @@ export default function CharDhamView() {
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify(formData),
+          body: JSON.stringify(normalizedData),
         })
         if (!response.ok) {
           throw new Error('Failed to create package')
@@ -162,9 +177,10 @@ export default function CharDhamView() {
   }
 
   const filteredPackages = packages.filter((packageData) => {
+    const idOrPackageId = (packageData.packageId || packageData._id || packageData.id || "").toString().toLowerCase()
     const matchesSearch = 
       packageData.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      packageData.packageId.toLowerCase().includes(searchQuery.toLowerCase())
+      idOrPackageId.includes(searchQuery.toLowerCase())
 
     const matchesStatus = statusFilter === "all" || packageData.status === statusFilter
     const matchesDifficulty = difficultyFilter === "all" || packageData.difficulty === difficultyFilter
@@ -231,8 +247,8 @@ export default function CharDhamView() {
           </TableHeader>
           <TableBody>
             {filteredPackages.map((packageData) => (
-              <TableRow key={packageData.id}>
-                <TableCell className="font-medium">{packageData.packageId}</TableCell>
+              <TableRow key={packageData._id || packageData.id || packageData.packageId}>
+                <TableCell className="font-medium">{packageData.packageId || packageData._id || packageData.id}</TableCell>
                 <TableCell>{packageData.title}</TableCell>
                 <TableCell>{packageData.duration}</TableCell>
                 <TableCell>{packageData.difficulty}</TableCell>
