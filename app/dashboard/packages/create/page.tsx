@@ -260,7 +260,7 @@ export default function CreatePackagePage() {
 
   const handleGalleryUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
-      setGalleryImages(prev => [...prev, ...Array.from(e.target.files)]);
+      setGalleryImages(prev => [...prev, ...Array.from(e.target.files || [])]);
     }
   }
 
@@ -311,9 +311,18 @@ export default function CreatePackagePage() {
     try {
       setIsLoading(true)
       const formData = new FormData()
-      Object.keys(data).forEach((key) => {
+      
+      // Transform howToReach from array of objects to array of strings
+      const preparedData = { ...data }
+      if (Array.isArray(preparedData.howToReach) && preparedData.howToReach.length > 0) {
+        preparedData.howToReach = preparedData.howToReach.map((item: any) => 
+          typeof item === 'object' && item.instruction ? item.instruction : item
+        ) as any
+      }
+
+      Object.keys(preparedData).forEach((key) => {
         if (key !== "images" && key !== "pdf") {
-          const value = data[key as keyof PackageFormValues]
+          const value = preparedData[key as keyof PackageFormValues]
           if (value !== undefined && value !== null) {
             if (Array.isArray(value) || (typeof value === "object" && value !== null)) {
               formData.append(key, JSON.stringify(value))
