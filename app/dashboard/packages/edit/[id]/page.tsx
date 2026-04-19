@@ -623,9 +623,10 @@ export default function EditPackagePage() {
                             </FormControl>
                             <SelectContent>
                               {isLoadingCategories ? (
-                                <SelectItem value="loading" disabled>
-                                  Loading categories...
-                                </SelectItem>
+                                <div className="flex items-center justify-center p-2 text-muted-foreground text-sm">
+                                  <Loader2 className="h-4 w-4 animate-spin mr-2 text-primary" />
+                                  <span>Loading categories...</span>
+                                </div>
                               ) : categories.length > 0 ? (
                                 categories.map((category) => (
                                   <SelectItem key={category._id} value={category._id}>

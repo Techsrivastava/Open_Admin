@@ -15,7 +15,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion"
-import { ArrowLeft, Calendar, FileText, Info, Plus, Trash, Upload, X, Trash2 } from "lucide-react"
+import { ArrowLeft, Calendar, FileText, Info, Plus, Trash, Upload, X, Trash2, Loader2 } from "lucide-react"
 import { useToast } from "@/components/ui/use-toast"
 import DashboardLayout from "@/components/dashboard-layout"
 import { createPackage, getCategories } from "@/api/package-controller"
@@ -81,7 +81,6 @@ export default function CreatePackagePage() {
   const [activeTab, setActiveTab] = useState("basic")
   const [categories, setCategories] = useState<any[]>([])
   const [isLoadingCategories, setIsLoadingCategories] = useState(false)
-  const [itinerary, setItinerary] = useState<ItineraryDay[]>([{ day: 1, title: "", description: "" }])
   const [packagesArray, setPackagesArray] = useState<Package[]>([])
 
   // Refs for file inputs
@@ -157,12 +156,7 @@ export default function CreatePackagePage() {
     mode: "onChange"
   })
 
-   // Debug environment variables
-   useEffect(() => {
-    console.log("🌐 Environment check:", {
-      NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || "Not set",
-    })
-  }, [])
+
 
   // Fetch categories and packages array when component mounts
   useEffect(() => {
@@ -214,6 +208,15 @@ export default function CreatePackagePage() {
   useEffect(() => {
     console.log("🔥 Form Errors:", form.formState.errors)
   }, [form.formState.errors])
+
+  // Auto-renumber itinerary days
+  useEffect(() => {
+    itineraryFields.forEach((field, index) => {
+      if ((field as any).day !== index + 1) {
+        form.setValue(`itinerary.${index}.day`, index + 1)
+      }
+    })
+  }, [itineraryFields, form])
 
   const { fields: itineraryFields, append: appendItinerary, remove: removeItinerary } = useFieldArray({
     name: "itinerary",
@@ -281,44 +284,25 @@ export default function CreatePackagePage() {
     formState: { errors },
   } = form
 
-  // Update form values when itinerary changes
-  useEffect(() => {
-    if (itinerary.length > 0) {
-      const formattedItinerary = itinerary.map((day, index) => ({
-        day: index + 1,
-        title: day.title || "",
-        description: day.description || "",
-      }))
 
-      form.setValue("itinerary", formattedItinerary, {
-        shouldValidate: true,
-        shouldDirty: true,
-        shouldTouch: true,
-      })
-    }
-  }, [itinerary, form])
-
-  // Debug form values
-  useEffect(() => {
-    const subscription = form.watch((value) => {
-      console.log("Form values:", value)
-      console.log("Current itinerary state:", itinerary)
-    })
-    return () => subscription.unsubscribe()
-  }, [form.watch, itinerary])
 
   const onSubmit = async (data: PackageFormValues) => {
     try {
       setIsLoading(true)
       const formData = new FormData()
       
-      // Transform howToReach from array of objects to array of strings
+      // Transform howToReach from array of objects to array of strings if needed
+      // transform logic based on API expectations
       const preparedData = { ...data }
-      if (Array.isArray(preparedData.howToReach) && preparedData.howToReach.length > 0) {
+      
+      if (Array.isArray(preparedData.howToReach)) {
         preparedData.howToReach = preparedData.howToReach.map((item: any) => 
           typeof item === 'object' && item.instruction ? item.instruction : item
         ) as any
       }
+
+      // Ensure array fields are strings where expected (if needed)
+      // or at least cleaned up before stringification.
 
       Object.keys(preparedData).forEach((key) => {
         if (key !== "images" && key !== "pdf") {
@@ -356,38 +340,13 @@ export default function CreatePackagePage() {
     }
   }
 
-  // Fix the updateDay function to properly update the itinerary state
-  const updateDay = (index: number, field: keyof ItineraryDay, value: string) => {
-    setItinerary((prev) => {
-      const updatedItinerary = [...prev]
-      updatedItinerary[index] = {
-        ...updatedItinerary[index],
-        [field]: value,
-      }
-      return updatedItinerary
-    })
-  }
-
   // Fix the addDay function to add a blank day instead of one with default values
   const addDay = () => {
-    setItinerary((prev) => [...prev, { day: prev.length + 1, title: "", description: "" }])
+    appendItinerary({ day: itineraryFields.length + 1, title: "", description: "" })
   }
 
   const removeDay = (index: number) => {
-    const newItinerary = itinerary.filter((_, i) => i !== index)
-    // Renumber remaining days
-    const updatedItinerary = newItinerary.map((day, i) => ({
-      ...day,
-      day: i + 1,
-    }))
-    setItinerary(updatedItinerary)
-
-    // Update form value immediately after removing a day
-    form.setValue("itinerary", updatedItinerary, {
-      shouldValidate: true,
-      shouldDirty: true,
-      shouldTouch: true,
-    })
+    removeItinerary(index)
   }
 
   return (
@@ -581,7 +540,7 @@ export default function CreatePackagePage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Category</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value} disabled={isLoading}>
+                        <Select onValueChange={field.onChange} value={field.value} disabled={isLoading}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Select category" />
@@ -589,9 +548,10 @@ export default function CreatePackagePage() {
                           </FormControl>
                           <SelectContent>
                             {isLoadingCategories ? (
-                              <SelectItem value="loading" disabled>
-                                Loading categories...
-                              </SelectItem>
+                              <div className="flex items-center justify-center p-2">
+                                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                <span>Loading...</span>
+                              </div>
                             ) : categories.length > 0 ? (
                               categories.map((category) => (
                                 <SelectItem key={category._id} value={category._id}>
@@ -855,34 +815,53 @@ export default function CreatePackagePage() {
                       </div>
 
                       <div className="space-y-4 border rounded-lg p-4">
-                        {itinerary.map((day, index) => (
-                          <div key={index} className="grid gap-4">
+                        {itineraryFields.map((field, index) => (
+                          <div key={field.id} className="grid gap-4 p-4 border rounded-md bg-muted/30">
                             <div className="flex items-center gap-2">
-                              <span className="font-medium min-w-[80px]">Day {day.day}</span>
-                              <Input
-                                value={day.title}
-                                onChange={(e) => updateDay(index, "title", e.target.value)}
-                                placeholder={`Enter day ${day.day} title`}
-                                className="flex-1"
-                                disabled={isLoading}
+                              <span className="font-medium min-w-[80px]">Day {index + 1}</span>
+                              <FormField
+                                control={form.control}
+                                name={`itinerary.${index}.title`}
+                                render={({ field }) => (
+                                  <FormItem className="flex-1">
+                                    <FormControl>
+                                      <Input
+                                        {...field}
+                                        placeholder={`Enter day ${index + 1} title`}
+                                        disabled={isLoading}
+                                      />
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
                               />
                               <Button
                                 type="button"
                                 variant="ghost"
                                 size="icon"
                                 onClick={() => removeDay(index)}
-                                disabled={isLoading}
+                                disabled={isLoading || itineraryFields.length <= 1}
                               >
                                 <X className="h-4 w-4" />
                               </Button>
                             </div>
-                          <Textarea
-                              value={day.description}
-                              onChange={(e) => updateDay(index, "description", e.target.value)}
-                              placeholder={`Enter detailed description for day ${day.day}`}
-                              className="min-h-[100px]"
-                            disabled={isLoading}
-                          />
+                            <FormField
+                              control={form.control}
+                              name={`itinerary.${index}.description`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormControl>
+                                    <Textarea
+                                      {...field}
+                                      placeholder={`Enter detailed description for day ${index + 1}`}
+                                      className="min-h-[100px]"
+                                      disabled={isLoading}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
                           </div>
                         ))}
                       </div>
@@ -1634,16 +1613,16 @@ export default function CreatePackagePage() {
                   <Button type="button" variant="outline" onClick={() => setActiveTab("trek")}>
                     Back
                   </Button>
-                    <Button type="submit" disabled={isLoading} className="min-w-[100px]">
-                      {isLoading ? (
-                        <>
-                          <span className="mr-2">Creating...</span>
-                          <div className="h-4 w-4 animate-spin rounded-full border-2 border-background border-t-foreground" />
-                        </>
-                      ) : (
-                        "Create Package"
-                      )}
-</Button>
+                  <Button type="submit" disabled={isLoading} className="min-w-[150px]">
+                    {isLoading ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Creating...
+                      </>
+                    ) : (
+                      "Create Package"
+                    )}
+                  </Button>
                 </CardFooter>
               </Card>
             </TabsContent>
