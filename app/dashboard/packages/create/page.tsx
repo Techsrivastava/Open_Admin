@@ -209,14 +209,7 @@ export default function CreatePackagePage() {
     console.log("🔥 Form Errors:", form.formState.errors)
   }, [form.formState.errors])
 
-  // Auto-renumber itinerary days
-  useEffect(() => {
-    itineraryFields.forEach((field, index) => {
-      if ((field as any).day !== index + 1) {
-        form.setValue(`itinerary.${index}.day`, index + 1)
-      }
-    })
-  }, [itineraryFields, form])
+
 
   const { fields: itineraryFields, append: appendItinerary, remove: removeItinerary } = useFieldArray({
     name: "itinerary",
@@ -347,6 +340,15 @@ export default function CreatePackagePage() {
 
   const removeDay = (index: number) => {
     removeItinerary(index)
+    
+    // Explicitly re-set all day numbers after removal to ensure consistency
+    // This is safer than a side-effect loop
+    const currentItinerary = form.getValues("itinerary")
+    if (currentItinerary) {
+      currentItinerary.forEach((_, i) => {
+        form.setValue(`itinerary.${i}.day`, i + 1)
+      })
+    }
   }
 
   return (
@@ -540,7 +542,7 @@ export default function CreatePackagePage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Category</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value} disabled={isLoading}>
+                        <Select onValueChange={field.onChange} value={field.value || ""} disabled={isLoading}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Select category" />

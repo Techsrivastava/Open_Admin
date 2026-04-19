@@ -140,7 +140,8 @@ export default function PackagesPage() {
     ranges.forEach(range => priceRangeMap.set(range.label, 0))
     
     data.forEach(pkg => {
-      const price = parseInt(pkg.originalPrice)
+      const priceStr = String(pkg?.originalPrice || "0")
+      const price = parseInt(priceStr.replace(/[^0-9]/g, "")) || 0
       const range = ranges.find(r => price >= r.min && price <= r.max)
       if (range) {
         priceRangeMap.set(range.label, (priceRangeMap.get(range.label) || 0) + 1)
@@ -300,7 +301,7 @@ export default function PackagesPage() {
                             <TableCell>{pkg.duration}</TableCell>
                             <TableCell>
                               <div className="space-y-1">
-                                <div>₹{pkg.originalPrice}</div>
+                                <div>₹{pkg.originalPrice || "0"}</div>
                                 {pkg.offerPrice && <div className="text-sm text-green-600">Offer: ₹{pkg.offerPrice}</div>}
                               </div>
                             </TableCell>
@@ -316,7 +317,7 @@ export default function PackagesPage() {
                                 )}
                               </div>
                             </TableCell>
-                            <TableCell>{new Date(pkg.createdAt).toLocaleDateString()}</TableCell>
+                            <TableCell>{pkg.createdAt ? new Date(pkg.createdAt).toLocaleDateString() : "N/A"}</TableCell>
                             <TableCell className="text-right">
                               <div className="flex justify-end gap-2">
                                 <Button
@@ -429,10 +430,11 @@ export default function PackagesPage() {
               <div className="mb-4">
                 <h3 className="text-lg font-semibold">City-wise Packages</h3>
                 <ul>
-                  {Object.entries(packages.reduce((acc, pkg) => {
-                    acc[pkg.city] = (acc[pkg.city] || 0) + 1;
+                  {Object.entries(packages.reduce((acc: any, pkg) => {
+                    const city = pkg.city || "Unknown";
+                    acc[city] = (acc[city] || 0) + 1;
                     return acc;
-                  }, {})).map(([city, count]) => (
+                  }, {})).map(([city, count]: [string, any]) => (
                     <li key={city}>
                       {city}: {count} package{count > 1 ? 's' : ''}
                     </li>
@@ -538,7 +540,10 @@ export default function PackagesPage() {
                 <CardContent>
                   <div className="text-2xl font-bold">
                     ₹{packages.length > 0 
-                      ? (packages.reduce((sum, pkg) => sum + parseInt(pkg.originalPrice), 0) / packages.length).toFixed(0)
+                      ? (packages.reduce((sum, pkg) => {
+                          const price = parseInt(String(pkg?.originalPrice || "0").replace(/[^0-9]/g, "")) || 0;
+                          return sum + price;
+                        }, 0) / packages.length).toFixed(0)
                       : 0}
                   </div>
                   <p className="text-xs text-muted-foreground">
